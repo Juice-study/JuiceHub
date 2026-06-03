@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CalStack</title>
+  <!-- 引入样式文件 -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== 两栏布局容器 ===== -->
+  <div class="app-layout">
+
+    <!-- ===== 左侧边栏：日历列表 ===== -->
+    <aside class="sidebar">
+      <!-- 侧边栏头部 -->
+      <div class="sidebar-header">
+        <span class="sidebar-title">我的日历</span>
+        <button id="addCalendarBtn" class="sidebar-add-btn" title="新建日历">+ 新建</button>
+      </div>
+      <!-- 日历列表（由 JS 动态生成） -->
+      <div id="sidebarList" class="sidebar-list">
+        <!-- 侧边栏项目会由 JS 渲染到这里 -->
+      </div>
+    </aside>
+
+    <!-- ===== 右侧主区域 ===== -->
+    <div class="main-area">
+
+      <!-- 页面顶部：标题 + 记录数 -->
+      <header class="header">
+        <h1 id="mainTitle" class="title">CalStack</h1>
+        <div id="mainCounter" class="counter">
+          <span class="counter-base">共 <span id="meetingCount">0</span> 条记录</span>
+          <span id="statsSummary" class="stats-summary"></span>
+        </div>
+      </header>
+
+      <!-- 日历导航栏：上一月 / 当前月 / 下一月 + 跳转选择器 -->
+      <nav class="calendar-nav">
+        <button id="prevMonth" class="nav-btn">&#9664;</button>
+        <span id="currentMonth" class="month-label"></span>
+        <button id="nextMonth" class="nav-btn">&#9654;</button>
+
+        <!-- 快捷跳转选择器：年/月/日（可输入 + 点击下拉选择） + 跳转按钮 -->
+        <div class="jump-inline">
+          <div class="jump-combo" data-field="year">
+            <input id="jumpYearInput" class="jump-input" type="text" inputmode="numeric" maxlength="4" aria-label="年" placeholder="年">
+            <button type="button" class="jump-combo-arrow" data-target="year" aria-label="展开年份选项">▾</button>
+            <ul id="jumpYearList" class="jump-combo-list hidden"></ul>
+          </div>
+          <span class="jump-sep">年</span>
+          <div class="jump-combo jump-combo-sm" data-field="month">
+            <input id="jumpMonthInput" class="jump-input jump-input-sm" type="text" inputmode="numeric" maxlength="2" aria-label="月" placeholder="月">
+            <button type="button" class="jump-combo-arrow" data-target="month" aria-label="展开月份选项">▾</button>
+            <ul id="jumpMonthList" class="jump-combo-list hidden"></ul>
+          </div>
+          <span class="jump-sep">月</span>
+          <div class="jump-combo jump-combo-sm" data-field="day">
+            <input id="jumpDayInput" class="jump-input jump-input-sm" type="text" inputmode="numeric" maxlength="2" aria-label="日" placeholder="日">
+            <button type="button" class="jump-combo-arrow" data-target="day" aria-label="展开日选项">▾</button>
+            <ul id="jumpDayList" class="jump-combo-list hidden"></ul>
+          </div>
+          <span class="jump-sep">日</span>
+          <button id="jumpGoBtn" class="jump-go-btn">跳转</button>
+          <button id="jumpTodayBtn" class="jump-today-btn" title="定位到今天">今天</button>
+        </div>
+      </nav>
+
+      <!-- 日历主体 -->
+      <main class="calendar-container">
+        <div class="weekday-header">
+          <div class="weekday-cell">日</div>
+          <div class="weekday-cell">一</div>
+          <div class="weekday-cell">二</div>
+          <div class="weekday-cell">三</div>
+          <div class="weekday-cell">四</div>
+          <div class="weekday-cell">五</div>
+          <div class="weekday-cell">六</div>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </main>
+
+    </div><!-- /main-area -->
+
+  </div><!-- /app-layout -->
+
+  <!-- ===== 编辑记录弹窗（点击日历日期时打开） ===== -->
+  <div id="editModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h2 id="modalDate" class="modal-date"></h2>
+
+      <div class="field">
+        <label class="field-label">心情</label>
+        <div id="moodPicker" class="emoji-picker">
+          <button class="emoji-btn" data-emoji="😊" title="开心">😊</button>
+          <button class="emoji-btn" data-emoji="🥰" title="喜欢">🥰</button>
+          <button class="emoji-btn" data-emoji="😍" title="心动">😍</button>
+          <button class="emoji-btn" data-emoji="😢" title="难过">😢</button>
+          <button class="emoji-btn" data-emoji="😤" title="生气">😤</button>
+          <button class="emoji-btn" data-emoji="😴" title="疲惫">😴</button>
+          <button class="emoji-btn" data-emoji="🤗" title="拥抱">🤗</button>
+          <button class="emoji-btn" data-emoji="😎" title="酷">😎</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">地点</label>
+        <input type="text" id="locationInput" class="text-input" placeholder="输入地点..." maxlength="50">
+      </div>
+
+      <div class="field">
+        <label class="field-label">天气</label>
+        <div id="weatherPicker" class="emoji-picker">
+          <button class="emoji-btn" data-emoji="☀️" title="晴天">☀️</button>
+          <button class="emoji-btn" data-emoji="🌤️" title="多云">🌤️</button>
+          <button class="emoji-btn" data-emoji="🌧️" title="下雨">🌧️</button>
+          <button class="emoji-btn" data-emoji="❄️" title="下雪">❄️</button>
+          <button class="emoji-btn" data-emoji="🌙" title="夜晚">🌙</button>
+          <button class="emoji-btn" data-emoji="🌈" title="彩虹">🌈</button>
+          <button class="emoji-btn" data-emoji="💨" title="大风">💨</button>
+          <button class="emoji-btn" data-emoji="⛈️" title="雷暴">⛈️</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">日记</label>
+        <textarea id="diaryInput" class="text-input diary-input" placeholder="记录今天的故事..." maxlength="500"></textarea>
+      </div>
+
+      <!-- 自定义统计项目计数（只在该日历配置了 stats 时才显示） -->
+      <div class="field" id="recordStatsField" style="display:none">
+        <label class="field-label">统计</label>
+        <div id="recordStatsContainer" class="record-stats-container"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="saveBtn" class="action-btn save-btn">保存</button>
+        <button id="deleteBtn" class="action-btn delete-btn">删除记录</button>
+        <button id="closeBtn" class="action-btn close-btn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 总览模式 - 查看某天所有记录弹窗 ===== -->
+  <div id="overviewDayModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h2 id="overviewDayDate" class="modal-date"></h2>
+      <div id="overviewDayContent" class="overview-day-content">
+        <!-- 由 JS 动态填充：显示该日所有日历的记录 -->
+      </div>
+      <div class="modal-actions">
+        <button id="overviewDayCloseBtn" class="action-btn close-btn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 日历管理弹窗（新建/编辑日历） ===== -->
+  <div id="calendarModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h2 id="calendarModalTitle" class="modal-date">新建日历</h2>
+
+      <div class="field">
+        <label class="field-label">日历名称</label>
+        <input type="text" id="calNameInput" class="text-input" placeholder="给日历起个名字..." maxlength="20">
+      </div>
+
+      <div class="field">
+        <label class="field-label">图标</label>
+        <div id="calIconPicker" class="emoji-picker">
+          <button class="emoji-btn" data-emoji="❤️" title="爱心">❤️</button>
+          <button class="emoji-btn" data-emoji="🎮" title="游戏">🎮</button>
+          <button class="emoji-btn" data-emoji="📚" title="学习">📚</button>
+          <button class="emoji-btn" data-emoji="🏃" title="运动">🏃</button>
+          <button class="emoji-btn" data-emoji="🍔" title="美食">🍔</button>
+          <button class="emoji-btn" data-emoji="🎵" title="音乐">🎵</button>
+          <button class="emoji-btn" data-emoji="✈️" title="旅行">✈️</button>
+          <button class="emoji-btn" data-emoji="💼" title="工作">💼</button>
+          <button class="emoji-btn" data-emoji="🏠" title="家庭">🏠</button>
+          <button class="emoji-btn" data-emoji="🌱" title="成长">🌱</button>
+          <button class="emoji-btn" data-emoji="🎨" title="艺术">🎨</button>
+          <button class="emoji-btn" data-emoji="🐾" title="宠物">🐾</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">主题颜色</label>
+        <div id="calColorPicker" class="color-picker">
+          <!-- 马克龙色系预设 -->
+          <button class="color-swatch selected" data-color="#E8756D" style="background:#E8756D" title="草莓"></button>
+          <button class="color-swatch" data-color="#7EB6D8" style="background:#7EB6D8" title="天空蓝"></button>
+          <button class="color-swatch" data-color="#8CC680" style="background:#8CC680" title="抹茶"></button>
+          <button class="color-swatch" data-color="#C4A0D8" style="background:#C4A0D8" title="香芋"></button>
+          <button class="color-swatch" data-color="#F0B87A" style="background:#F0B87A" title="焦糖"></button>
+          <button class="color-swatch" data-color="#7ACCC8" style="background:#7ACCC8" title="薄荷"></button>
+          <button class="color-swatch" data-color="#F0A0B4" style="background:#F0A0B4" title="樱花"></button>
+          <button class="color-swatch" data-color="#A0B8D8" style="background:#A0B8D8" title="蓝莓"></button>
+          <button class="color-swatch" data-color="#D8C89A" style="background:#D8C89A" title="曲奇"></button>
+          <button class="color-swatch" data-color="#E8A090" style="background:#E8A090" title="蜜桃"></button>
+          <button class="color-swatch" data-color="#90C8A8" style="background:#90C8A8" title="马卡龙绿"></button>
+          <button class="color-swatch" data-color="#C8A0B0" style="background:#C8A0B0" title="玫瑰"></button>
+          <!-- 自定义取色器 -->
+          <label class="color-swatch custom-color-swatch" title="自定义颜色">
+            🎨
+            <input type="color" id="customColorInput" class="custom-color-input" value="#E8756D">
+          </label>
+        </div>
+      </div>
+
+      <!-- 自定义统计项目（非必填） -->
+      <div class="field">
+        <label class="field-label">自定义统计项目 <span class="field-hint">(选填，最多 20 项，每项 1-10 个字符)</span></label>
+        <div id="calStatsContainer" class="cal-stats-container"></div>
+        <button type="button" id="calAddStatBtn" class="cal-add-stat-btn">+ 添加统计项</button>
+      </div>
+
+      <div class="modal-actions">
+        <button id="calSaveBtn" class="action-btn save-btn">创建</button>
+        <button id="calDeleteBtn" class="action-btn delete-btn" style="display:none">删除日历</button>
+        <button id="calCloseBtn" class="action-btn close-btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入前端逻辑脚本 -->
+  <script src="app.js"></script>
+</body>
+</html>
